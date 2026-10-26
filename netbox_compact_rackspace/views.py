@@ -1,24 +1,31 @@
 from django.shortcuts import render
 from django.views.generic import View
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.db.models import Prefetch
 from dcim.models import Site, Location, Rack, Device
 
 class CompactRackSpaceView(PermissionRequiredMixin, View):
     permission_required = 'dcim.view_rack'
 
     def get(self, request):
-        # Получаем параметры фильтрации из URL
         selected_site_slug = request.GET.get('site')
         selected_location_id = request.GET.get('location')
 
-        # Списки для построения фильтров вверху страницы
+        # Списки для построения фильтров
         all_sites = Site.objects.filter(racks__isnull=False).distinct().order_by('name')
         all_locations = Location.objects.filter(racks__isnull=False).distinct().order_by('name')
 
-        # Базовый запрос площадок, у которых есть стойки
+        # Базовый запрос площадок
         sites_query = Site.objects.filter(racks__isnull=False).distinct().order_by('name')
         if selected_site_slug:
             sites_query = sites_query.filter(slug=selected_site_slug)
+
+        # ОПТИМИЗАЦИЯ: Готовим prefetch для устройств, чтобы достать их ОДНИМ запросом
+        devices_prefetch = Prefetch(
+            'devices',
+            queryset=Device.objects.exclude(position__isnull=True).only('id', 'name', 'rack_id', 'position'),
+            to_attr='prefetched_devices'
+        )
 
         grouped_data = []
         
@@ -28,22 +35,23 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
                 'locations': []
             }
             
-            # Фильтруем локации внутри площадки
+            # Фильтруем локации
             locations_query = Location.objects.filter(site=site, racks__isnull=False).distinct().order_by('name')
             if selected_location_id:
                 locations_query = locations_query.filter(id=selected_location_id)
             
-            # Если конкретная локация не выбрана, показываем стойки "Без локации"
+            # Стойки без локации (подтягиваем устройства через prefetch)
             if not selected_location_id:
-                root_racks = Rack.objects.filter(site=site, location__isnull=True).order_by('name')
+                root_racks = Rack.objects.filter(site=site, location__isnull=True).order_by('name').prefetch_related(devices_prefetch)
                 if root_racks.exists():
                     site_info['locations'].append({
                         'name': 'Без локации',
                         'racks': self._get_racks_data(root_racks)
                     })
                 
+            # Стойки внутри локаций (подтягиваем устройства через prefetch)
             for loc in locations_query:
-                loc_racks = Rack.objects.filter(location=loc).order_by('name')
+                loc_racks = Rack.objects.filter(location=loc).order_by('name').prefetch_related(devices_prefetch)
                 site_info['locations'].append({
                     'name': loc.name,
                     'racks': self._get_racks_data(loc_racks)
@@ -64,10 +72,13 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
         racks_list = []
         for rack in racks:
             total_u = rack.u_height
-            units = []
             
+            # Маппим устройства из памяти (уже закешированы в prefetch), а не из базы!
+            device_map = {d.position: d for d in rack.prefetched_devices}
+            
+            units = []
             for u in range(total_u, 0, -1):
-                device = Device.objects.filter(rack=rack, position=u).first()
+                device = device_map.get(u)
                 if device:
                     units.append({
                         'u_num': u,
@@ -85,11 +96,11 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
             utilization = int((occupied_count / total_u) * 100) if total_u > 0 else 0
             
             if utilization < 40:
-                header_color = '#28a745'  # Зеленый статус
+                header_color = '#28a745'
             elif utilization < 80:
-                header_color = '#ffc107'  # Желтый статус
+                header_color = '#ffc107'
             else:
-                header_color = '#dc3545'  # Красный статус
+                header_color = '#dc3545'
                 
             racks_list.append({
                 'id': rack.pk,
