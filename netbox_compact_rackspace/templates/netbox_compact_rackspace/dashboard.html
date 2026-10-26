@@ -19,6 +19,31 @@
     
     .u-state-free { background-color: #a8e6cf; }
     .u-state-occupied { background-color: #1d7a46; }
+
+    /* Жесткая фиксация размеров для устранения эффекта прыгающего фокуса */
+    .rackspace-filter-select { 
+        display: block; 
+        width: 100%; 
+        height: 38px !important; 
+        padding: 6px 12px; 
+        font-size: 14px; 
+        line-height: 1.42857143; 
+        color: #555; 
+        background-color: #fff; 
+        border: 1px solid #ccc; 
+        border-radius: 4px;
+        box-sizing: border-box !important;
+    }
+    .rackspace-filter-select:focus {
+        border-color: #66afe9;
+        outline: 0;
+        box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(102,175,233,.6);
+    }
+    .rackspace-btn-align {
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+    }
 </style>
 
 <div class="container-fluid">
@@ -28,28 +53,28 @@
 
     <!-- Блок интерактивных фильтров Сверху -->
     <div class="rackspace-filter-bar">
-        <form method="get" action="" class="form row align-items-end">
-            <div class="form-group col-md-4">
-                <label for="site" class="form-label font-weight-bold">Площадка</label>
-                <select name="site" id="site" class="form-select form-control">
+        <form method="get" action="" class="form row align-items-end" id="rackspace-filter-form">
+            <div class="form-group col-md-4 mb-2">
+                <label for="site" class="form-label font-weight-bold mb-1">Площадка</label>
+                <!-- onchange="this.form.submit()" отправляет форму мгновенно при выборе кликом -->
+                <select name="site" id="site" class="rackspace-filter-select" onchange="document.getElementById('rackspace-filter-form').submit();">
                     <option value="">--- Все площадки ---</option>
                     {% for s in all_sites %}
                         <option value="{{ s.slug }}" {% if selected_site == s.slug %}selected{% endif %}>{{ s.name }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group col-md-4">
-                <label for="location" class="form-label font-weight-bold">Локация</label>
-                <select name="location" id="location" class="form-select form-control">
+            <div class="form-group col-md-4 mb-2">
+                <label for="location" class="form-label font-weight-bold mb-1">Локация</label>
+                <select name="location" id="location" class="rackspace-filter-select" onchange="document.getElementById('rackspace-filter-form').submit();">
                     <option value="">--- Все локации ---</option>
                     {% for l in all_locations %}
                         <option value="{{ l.id }}" {% if selected_location == l.id|stringformat:"s" %}selected{% endif %}>{{ l.name }} ({{ l.site.name }})</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group col-md-4">
-                <button type="submit" class="btn btn-primary"><i class="mdi mdi-filter"></i> Применить</button>
-                <a href="." class="btn btn-outline-secondary"><i class="mdi mdi-close"></i> Сбросить</a>
+            <div class="form-group col-md-4 mb-2 text-end text-md-start">
+                <a href="." class="btn btn-outline-secondary rackspace-btn-align"><i class="mdi mdi-close"></i> Сбросить фильтры</a>
             </div>
         </form>
     </div>
@@ -76,6 +101,7 @@
                                         <div class="mini-unit-status u-state-occupied"></div>
                                     {% else %}
                                         <div class="mini-unit-status u-state-free"></div>
+                                    
                                     {% endif %}
                                 </div>
                             {% endfor %}
