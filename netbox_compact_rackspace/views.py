@@ -11,16 +11,19 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
         selected_site_slug = request.GET.get('site')
         selected_location_id = request.GET.get('location')
 
-        # Списки для построения фильтров
+        # Базовые списки для фильтров
         all_sites = Site.objects.filter(racks__isnull=False).distinct().order_by('name')
+        
+        # ДИНАМИЧЕСКИЙ ФИЛЬТР: Если площадка выбрана, показываем только её локации
         all_locations = Location.objects.filter(racks__isnull=False).distinct().order_by('name')
+        if selected_site_slug:
+            all_locations = all_locations.filter(site__slug=selected_site_slug)
 
-        # Базовый запрос площадок
+        # Запрос площадок для рендеринга
         sites_query = Site.objects.filter(racks__isnull=False).distinct().order_by('name')
         if selected_site_slug:
             sites_query = sites_query.filter(slug=selected_site_slug)
 
-        # ОПТИМИЗАЦИЯ: Готовим prefetch для устройств, чтобы достать их ОДНИМ запросом
         devices_prefetch = Prefetch(
             'devices',
             queryset=Device.objects.exclude(position__isnull=True).only('id', 'name', 'rack_id', 'position'),
@@ -35,12 +38,10 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
                 'locations': []
             }
             
-            # Фильтруем локации
             locations_query = Location.objects.filter(site=site, racks__isnull=False).distinct().order_by('name')
             if selected_location_id:
                 locations_query = locations_query.filter(id=selected_location_id)
             
-            # Стойки без локации (подтягиваем устройства через prefetch)
             if not selected_location_id:
                 root_racks = Rack.objects.filter(site=site, location__isnull=True).order_by('name').prefetch_related(devices_prefetch)
                 if root_racks.exists():
@@ -49,7 +50,6 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
                         'racks': self._get_racks_data(root_racks)
                     })
                 
-            # Стойки внутри локаций (подтягиваем устройства через prefetch)
             for loc in locations_query:
                 loc_racks = Rack.objects.filter(location=loc).order_by('name').prefetch_related(devices_prefetch)
                 site_info['locations'].append({
@@ -72,8 +72,6 @@ class CompactRackSpaceView(PermissionRequiredMixin, View):
         racks_list = []
         for rack in racks:
             total_u = rack.u_height
-            
-            # Маппим устройства из памяти (уже закешированы в prefetch), а не из базы!
             device_map = {d.position: d for d in rack.prefetched_devices}
             
             units = []
