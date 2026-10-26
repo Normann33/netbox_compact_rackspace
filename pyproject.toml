@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netbox_compact_rackspace"
+version = "0.1.0"
+description = "Компактная матрица стоек в стиле RackTables RackSpace"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Admin" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["netbox_compact_rackspace"]
