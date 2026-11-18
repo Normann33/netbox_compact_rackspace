@@ -56,3 +56,108 @@ sudo docker-compose up -d
 
 При переходе по ссылке откроется интерактивный дашборд. Фильтры вверху страницы динамически связаны: при выборе конкретной Площадки список доступных Локаций автоматически сократится до объектов, относящихся исключительно к ней.
 
+## NetBox Compact RackSpace Plugin — Установка (Non-Docker)
+
+Ультра-компактная матрица заполненности стоек (тепловая карта) для NetBox v4.7.x, вдохновлённая модулем RackSpace из RackTables.
+
+⚠️ Внимание: плагин неофициальный и не опубликован в PyPI, поэтому стандартная установка через pip install netbox-compact-rackspace невозможна. Ниже описана установка напрямую из этого репозитория.
+
+Требования
+NetBox v4.7.x (не-докерная установка)
+
+Установленный git в системе
+
+Права sudo для перезапуска служб
+
+Активированное виртуальное окружение NetBox
+
+### Установка
+1. Установка пакета из репозитория
+Перейдите в директорию установки NetBox, активируйте виртуальное окружение и установите плагин в режиме редактирования (-e), чтобы пакет был связан с папкой репозитория:
+
+```
+bash
+cd /opt/netbox
+source venv/bin/activate
+
+pip install -e git+https://github.com/Normann33/netbox_compact_rackspace.git#egg=netbox_compact_rackspace
+```
+Если pip не находит git, установите его: sudo apt install git (Debian/Ubuntu).
+
+### 2. Включение плагина в конфигурации
+Отредактируйте файл конфигурации NetBox:
+```
+bash
+sudo nano /opt/netbox/netbox/netbox/configuration.py
+```
+Добавьте имя плагина в список PLUGINS (используйте подчёркивания, не дефисы):
+
+```
+python
+PLUGINS = [
+    # ... другие ваши плагины ...
+    'netbox_compact_rackspace',
+]
+```
+Если переменной PLUGINS нет — создайте её. Сохраните файл.
+
+### 3. Миграции и сбор статики
+```
+bash
+cd /opt/netbox/netbox
+source ../../venv/bin/activate
+
+python3 manage.py migrate
+python3 manage.py collectstatic --no-input
+```
+### 4. Перезапуск служб
+```
+bash
+sudo systemctl restart netbox netbox-rq
+Если netbox-rq не используется в вашей установке — перезапустите только netbox.
+```
+### Проверка
+Войдите в веб-интерфейс NetBox.
+
+В левом боковом меню, в самом низу (в блоке установленных плагинов), появится пункт «Компактный RackSpace».
+
+### Использование
+После запуска в меню появится «Компактный RackSpace». При переходе откроется интерактивный дашборд:
+
+Ультра-компактный вид: все стойки на одном экране в виде адаптивной пиксельной сетки.
+
+Пиксельное отображение: тёмно-зелёный — занято устройством, светло-зелёный — свободно.
+
+Подсказки: наведение на юнит показывает номер юнита и имя устройства; клик открывает карточку сервера в новой вкладке.
+
+Группировка: стойки автоматически распределяются по Площадкам (Sites) и Локациям (Locations).
+
+Связанные фильтры: выбор площадки автоматически сокращает список доступных локаций.
+
+### Обновление
+```
+bash
+cd /opt/netbox
+source venv/bin/activate
+
+pip install -e git+https://github.com/Normann33/netbox_compact_rackspace.git#egg=netbox_compact_rackspace --upgrade
+
+cd netbox
+python3 manage.py migrate
+python3 manage.py collectstatic --no-input
+
+sudo systemctl restart netbox netbox-rq
+Удаление
+bash
+cd /opt/netbox
+source venv/bin/activate
+
+pip uninstall netbox_compact_rackspace
+```
+Затем удалите 'netbox_compact_rackspace' из PLUGINS в configuration.py и перезапустите службы:
+```
+bash
+sudo systemctl restart netbox netbox-rq
+```
+Важное предупреждение
+Этот плагин является неофициальным и не проходил проверку со стороны сообщества NetBox или NetBox Labs. Устанавливая его, вы берёте на себя риски, связанные с безопасностью и стабильностью. Рекомендуется протестировать его на стенде или резервной копии перед установкой в продакшн.
